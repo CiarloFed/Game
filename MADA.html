@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAS HADAS EN LAS HONDAS</title>
+    <!-- Caricamento di Tailwind CSS per lo styling rapido e responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Stile di base per il corpo del documento */
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation; /* Disabilita il doppio tocco per zoomare sui cellulari */
+        }
+
+        /* Stile per la griglia di gioco */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(10, minmax(0, 1fr));
+            grid-template-rows: repeat(10, minmax(0, 1fr));
+            border: 2px solid #f472b6; /* pink-400 */
+            border-radius: 0.5rem; /* rounded-lg */
+            overflow: hidden;
+            aspect-ratio: 1 / 1; /* Mantiene la griglia quadrata */
+        }
+
+        /* Stile per le singole celle */
+        .cell {
+            width: 100%;
+            height: 100%;
+            aspect-ratio: 1 / 1; /* Assicura che le celle siano quadrate */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(1.2rem, 3.5vw, 1.75rem); /* Dimensione del font responsive */
+            border: 1px solid #fecdd3; /* pink-100 */
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none; /* Impedisce la selezione del testo */
+        }
+
+        /* === STATI DELLE CELLE === */
+
+        /* Cella selezionata dal giocatore (tocco singolo) */
+        .cell.selected {
+            outline: 4px solid #db2777; /* pink-600 */
+            outline-offset: -3px;
+            box-shadow: 0 0 15px rgba(219, 39, 119, 0.7);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        /* Cella intatta (default) */
+        .cell.untouched {
+            background-color: #fbcfe8; /* pink-200 (rosa chiaro) */
+        }
+
+        /* Nave del giocatore (intatta) */
+        .cell.player-ship {
+            background-color: #fbcfe8; /* pink-200 */
+        }
+        
+        /* Cella mancata (Miss) */
+        .cell.miss {
+            background-color: #e5e7eb; /* grigio-200 */
+        }
+
+        /* Nave IA colpita (Hit) */
+        .cell.ai-hit {
+            background-color: #ef4444; /* rosso-500 */
+        }
+
+        /* Nave giocatore colpita (Hit) */
+        .cell.player-hit {
+            background-color: #fbcfe8; /* pink-200 */
+        }
+
+        /* Nave IA affondata (Sunk) */
+        .cell.ai-sunk {
+            background-color: #fde047; /* giallo-400 (giallo acceso) */
+            animation: pulse-yellow 1s infinite;
+        }
+
+        /* Nave giocatore affondata (Sunk) */
+        .cell.player-sunk {
+            background-color: #000000; /* nero */
+            color: white;
+            animation: pulse-black 1s infinite;
+        }
+
+        /* Animazioni per le navi affondate */
+        @keyframes pulse-yellow {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 5px #fde047; }
+            50% { transform: scale(1.05); box-shadow: 0 0 15px #fde047; }
+        }
+        @keyframes pulse-black {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 5px #333; }
+            50% { transform: scale(1.05); box-shadow: 0 0 15px #777; }
+        }
+
+        /* Stile per il messaggio di vittoria */
+        #status-message.win-message {
+            font-size: 1.5rem; /* 2xl */
+            color: #16a34a; /* verde-600 */
+            font-weight: 700; /* bold */
+            animation: bounce-in 1s ease;
+        }
+
+        @keyframes bounce-in {
+            0% { transform: scale(0.5); opacity: 0; }
+            60% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-pink-50 text-gray-800 flex flex-col items-center justify-center min-h-screen p-2 sm:p-4">
+
+    <main class="w-full max-w-4xl mx-auto p-4 bg-white rounded-2xl shadow-2xl">
+        <!-- Titolo del Gioco -->
+        <h1 class="text-3xl sm:text-4xl font-bold text-center text-pink-600 mb-4">
+            LAS HADAS EN LAS HONDAS
+        </h1>
+        
+        <!-- Area Messaggi e Pulsante Riavvia -->
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-4 px-2">
+            <div id="status-message" class="text-lg font-medium text-gray-700 text-center sm:text-left mb-2 sm:mb-0 h-10">
+                Inizia la battaglia!
+            </div>
+            <button id="restart-button" class="px-5 py-2 bg-pink-500 text-white rounded-lg shadow hover:bg-pink-600 transition duration-300 active:scale-95">
+                Riavvia
+            </button>
+        </div>
+
+        <!-- Area di Gioco (Griglie) -->
+        <div id="game-area" class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
+            
+            <!-- Griglia dell'IA (con cui il giocatore interagisce) -->
+            <div>
+                <h2 class="text-xl font-semibold text-center text-red-600 mb-2">MALA HONDA</h2>
+                <div id="ai-board" class="game-grid shadow-lg">
+                    <!-- Le celle vengono generate da JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Griglia del Giocatore -->
+            <div>
+                <h2 class="text-xl font-semibold text-center text-green-600 mb-2">LAS HADAS DE MADA</h2>
+                <div id="player-board" class="game-grid shadow-lg">
+                    <!-- Le celle vengono generate da JavaScript -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // === COSTANTI E VARIABILI DI STATO ===
+            const GRID_SIZE = 10;
+            const SHIP_LENGTHS = [5, 4, 3]; // Lunghezze delle navi
+            const AI_TURN_DELAY = 1200; // Ritardo per il turno dell'IA
+
+            // Elementi DOM
+            const playerBoardEl = document.getElementById('player-board');
+            const aiBoardEl = document.getElementById('ai-board');
+            const statusMessageEl = document.getElementById('status-message');
+            const restartButton = document.getElementById('restart-button');
+
+            // Stato del gioco
+            let playerBoardState, aiBoardState;
+            let playerShips, aiShips;
+            let gameState = 'PLAYER_TURN'; // 'PLAYER_TURN', 'AI_TURN', 'GAME_OVER'
+            let selectedCellEl = null; // Cella selezionata con tocco singolo
+            let aiGuesses = []; // Per evitare che l'IA colpisca due volte lo stesso posto
+
+            // Icone
+            const ICONS = {
+                UNTOUCHED: '🌊', // Onda
+                MISS: '☁️',      // Nuvola
+                PLAYER_SHIP: '🧚‍♀️', // Fata
+                AI_HIT: '☀️',     // Sole
+                PLAYER_HIT: '🔥',  // Fuoco
+                AI_SUNK: '🏄🏾‍♀️',  // Surfista donna mora
+                PLAYER_SUNK: '⚡️' // Fulmine
+            };
+
+            // === FUNZIONI DI INIZIALIZZAZIONE ===
+
+            /** Inizializza l'intero gioco */
+            function initializeGame() {
+                // Resetta lo stato
+                gameState = 'PLAYER_TURN';
+                playerBoardState = createEmptyBoard();
+                aiBoardState = createEmptyBoard();
+                aiGuesses = [];
+                selectedCellEl = null;
+                
+                // Posiziona le navi
+                playerShips = placeShipsRandomly(playerBoardState, 'player');
+                aiShips = placeShipsRandomly(aiBoardState, 'ai');
+
+                // Renderizza le griglie
+                renderBoard(playerBoardEl, playerBoardState, 'player');
+                renderBoard(aiBoardEl, aiBoardState, 'ai');
+
+                // Aggiunge gli ascoltatori di eventi solo alla griglia dell'IA
+                addCellListeners();
+
+                // Aggiorna il messaggio di stato
+                updateStatusMessage("Tocca per selezionare, tocca di nuovo per colpire!");
+                statusMessageEl.classList.remove('win-message');
+            }
+
+            /** * Crea una griglia 10x10 vuota.
+             * *** CORREZIONE: *** Assicura che ogni cella sia un oggetto unico.
+             */
+            function createEmptyBoard() {
+                return Array(GRID_SIZE).fill(null).map(() => 
+                    Array(GRID_SIZE).fill(null).map(() => ({ state: 'untouched', shipId: null }))
+                );
+            }
+
+            /** Posiziona le navi casualmente su una griglia */
+            function placeShipsRandomly(board, playerType) {
+                const ships = [];
+                SHIP_LENGTHS.forEach((length, index) => {
+                    let placed = false;
+                    const shipId = `${playerType}_ship_${index}`;
+                    
+                    while (!placed) {
+                        const orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+                        const y = Math.floor(Math.random() * GRID_SIZE);
+                        const x = Math.floor(Math.random() * GRID_SIZE);
+
+                        if (canPlaceShip(board, y, x, length, orientation)) {
+                            const cells = [];
+                            for (let i = 0; i < length; i++) {
+                                let currentY = y, currentX = x;
+                                if (orientation === 'horizontal') currentX += i;
+                                else currentY += i;
+                                
+                                board[currentY][currentX] = { state: 'ship', shipId: shipId };
+                                cells.push([currentY, currentX]);
+                            }
+                            ships.push({ id: shipId, length: length, hits: 0, sunk: false, cells: cells });
+                            placed = true;
+                        }
+                    }
+                });
+                return ships;
+            }
+
+            /** Controlla se una nave può essere posizionata */
+            function canPlaceShip(board, y, x, length, orientation) {
+                for (let i = 0; i < length; i++) {
+                    let currentY = y, currentX = x;
+                    if (orientation === 'horizontal') currentX += i;
+                    else currentY += i;
+
+                    // Controlla i bordi della griglia
+                    if (currentY >= GRID_SIZE || currentX >= GRID_SIZE) return false;
+                    
+                    // Controlla la sovrapposizione
+                    if (board[currentY][currentX].state !== 'untouched') return false;
+                }
+                return true;
+            }
+
+            // === FUNZIONI DI RENDERING ===
+
+            /** Renderizza una singola griglia */
+            function renderBoard(boardEl, boardState, playerType) {
+                boardEl.innerHTML = ''; // Pulisce la griglia precedente
+                boardState.forEach((row, y) => {
+                    row.forEach((cellData, x) => {
+                        const cellEl = document.createElement('div');
+                        cellEl.dataset.y = y;
+                        cellEl.dataset.x = x;
+                        
+                        // Applica lo stile e l'icona
+                        styleCell(cellEl, cellData, playerType);
+                        
+                        boardEl.appendChild(cellEl);
+                    });
+                });
+            }
+
+            /** Applica lo stile e l'icona a una singola cella */
+            function styleCell(cellEl, cellData, playerType) {
+                let cellState = cellData.state;
+                let icon = '';
+                let cssClass = 'cell';
+
+                // Nasconde le navi dell'IA non colpite
+                if (playerType === 'ai' && cellState === 'ship') {
+                    cellState = 'untouched';
+                }
+
+                switch (cellState) {
+                    case 'untouched':
+                        cssClass += ' untouched';
+                        icon = ICONS.UNTOUCHED;
+                        break;
+                    case 'ship': // Si applica solo alla griglia del giocatore
+                        cssClass += ' player-ship';
+                        icon = ICONS.PLAYER_SHIP;
+                        break;
+                    case 'miss':
+                        cssClass += ' miss';
+                        icon = ICONS.MISS;
+                        break;
+                    case 'hit':
+                        if (playerType === 'player') {
+                            cssClass += ' player-hit';
+                            icon = ICONS.PLAYER_HIT;
+                        } else {
+                            cssClass += ' ai-hit';
+                            icon = ICONS.AI_HIT; // Userà l'icona SOLE
+                        }
+                        break;
+                    case 'sunk':
+                         if (playerType === 'player') {
+                            cssClass += ' player-sunk';
+                            icon = ICONS.PLAYER_SUNK;
+                        } else {
+                            cssClass += ' ai-sunk';
+                            icon = ICONS.AI_SUNK;
+                        }
+                        break;
+                }
+                
+                cellEl.className = cssClass;
+                cellEl.innerHTML = icon;
+            }
+
+            /** Aggiorna il messaggio di stato */
+            function updateStatusMessage(message) {
+                statusMessageEl.textContent = message;
+            }
+
+            // === GESTIONE EVENTI ===
+
+            /** Aggiunge gli ascoltatori di 'click' alle celle della griglia IA */
+            function addCellListeners() {
+                const aiCells = aiBoardEl.querySelectorAll('.cell');
+                aiCells.forEach(cell => {
+                    // Usiamo 'click' che su mobile funziona come 'tap'
+                    cell.addEventListener('click', handleCellTap);
+                });
+            }
+
+            /** Gestisce il tocco (seleziona e conferma) */
+            function handleCellTap(e) {
+                if (gameState !== 'PLAYER_TURN') return;
+
+                const targetCellEl = e.currentTarget;
+                const y = parseInt(targetCellEl.dataset.y);
+                const x = parseInt(targetCellEl.dataset.x);
+                const cellState = aiBoardState[y][x].state;
+
+                // Impedisce di interagire con celle già colpite
+                if (cellState === 'hit' || cellState === 'miss' || cellState === 'sunk') {
+                    return;
+                }
+
+                // === Logica Seleziona/Conferma ===
+                
+                if (targetCellEl === selectedCellEl) {
+                    // È il secondo tocco sulla cella già selezionata: FUOCO!
+                    clearSelection();
+                    handlePlayerFire(y, x);
+                } else {
+                    // È un tocco su una nuova cella: SELEZIONA
+                    clearSelection(); // Rimuove la vecchia selezione
+                    selectedCellEl = targetCellEl;
+                    targetCellEl.classList.add('selected');
+                }
+            }
+            
+            /** Rimuove l'evidenziazione della selezione */
+            function clearSelection() {
+                if (selectedCellEl) {
+                    selectedCellEl.classList.remove('selected');
+                    selectedCellEl = null;
+                }
+            }
+            
+            /** Gestisce il click sul pulsante Riavvia */
+            restartButton.addEventListener('click', initializeGame);
+
+            // === LOGICA DI GIOCO ===
+
+            /** Gestisce il fuoco del giocatore */
+            function handlePlayerFire(y, x) {
+                if (gameState !== 'PLAYER_TURN') return;
+                
+                const targetCell = aiBoardState[y][x];
+                
+                // Impedisce di colpire due volte (controllo di sicurezza)
+                if (targetCell.state === 'hit' || targetCell.state === 'miss' || targetCell.state === 'sunk') {
+                    return;
+                }
+
+                gameState = 'PROCESSING'; // Blocca input
+                
+                if (targetCell.shipId) {
+                    // Colpito!
+                    targetCell.state = 'hit';
+                    const ship = findShip(aiShips, targetCell.shipId);
+                    ship.hits++;
+                    updateStatusMessage("Hai colpito MALA HONDA!");
+
+                    if (ship.hits === ship.length) {
+                        ship.sunk = true;
+                        markShipAsSunk(aiBoardState, ship);
+                        updateStatusMessage("Nave di MALA HONDA affondata!");
+                    }
+                } else {
+                    // Mancato!
+                    targetCell.state = 'miss';
+                    updateStatusMessage("Mancato!");
+                }
+                
+                // Ridisegna la griglia dell'IA
+                renderBoard(aiBoardEl, aiBoardState, 'ai');
+                addCellListeners(); // Ri-aggiunge gli ascoltatori
+
+                // Controlla la vittoria
+                if (checkGameOver()) return;
+
+                // Passa il turno all'IA
+                setTimeout(aiTurn, AI_TURN_DELAY);
+            }
+
+            /** Esegue il turno dell'IA (IA Base: casuale) */
+            function aiTurn() {
+                if (gameState === 'GAME_OVER') return;
+                
+                gameState = 'AI_TURN';
+                updateStatusMessage("Turno di MALA HONDA...");
+
+                let y, x, validGuess = false;
+                
+                // L'IA continua a tirare finché non trova una cella non colpita
+                while (!validGuess) {
+                    y = Math.floor(Math.random() * GRID_SIZE);
+                    x = Math.floor(Math.random() * GRID_SIZE);
+                    
+                    const guessKey = `${y}-${x}`;
+                    if (!aiGuesses.includes(guessKey)) {
+                        aiGuesses.push(guessKey);
+                        validGuess = true;
+                    }
+                }
+                
+                const targetCell = playerBoardState[y][x];
+
+                // Ritardo per mostrare il pensiero dell'IA
+                setTimeout(() => {
+                    if (targetCell.shipId) {
+                        // Colpito!
+                        targetCell.state = 'hit';
+                        const ship = findShip(playerShips, targetCell.shipId);
+                        ship.hits++;
+                        updateStatusMessage("MALA HONDA ha colpito una Fata!");
+
+                        if (ship.hits === ship.length) {
+                            ship.sunk = true;
+                            markShipAsSunk(playerBoardState, ship);
+                            updateStatusMessage("Le Fate di MADA sono state affondate!");
+                        }
+                    } else {
+                        // Mancato!
+                        targetCell.state = 'miss';
+                        updateStatusMessage("MALA HONDA ha mancato.");
+                    }
+                    
+                    // Ridisegna la griglia del giocatore
+                    renderBoard(playerBoardEl, playerBoardState, 'player');
+
+                    // Controlla la sconfitta
+                    if (checkGameOver()) return;
+
+                    // Ritorna il turno al giocatore
+                    gameState = 'PLAYER_TURN';
+                    updateStatusMessage("Il tuo turno! Seleziona e colpisci.");
+
+                }, AI_TURN_DELAY / 2); // Divide il ritardo per un effetto più fluido
+            }
+            
+            /** Controlla se la partita è finita */
+            function checkGameOver() {
+                const playerWon = aiShips.every(ship => ship.sunk);
+                const aiWon = playerShips.every(ship => ship.sunk);
+
+                if (playerWon) {
+                    gameState = 'GAME_OVER';
+                    updateStatusMessage("MADA, REINA DEL MAR, ERES LA MEJOR SURFISTA DEL MUNDO!");
+                    statusMessageEl.classList.add('win-message');
+                    clearSelection();
+                    return true;
+                }
+
+                if (aiWon) {
+                    gameState = 'GAME_OVER';
+                    updateStatusMessage("MALA HONDA ha vinto. Le Fate sono tristi.");
+                    clearSelection();
+                    return true;
+                }
+                
+                return false;
+            }
+
+            // === FUNZIONI DI UTILITÀ ===
+            
+            /** Trova un oggetto nave dal suo ID */
+            function findShip(shipsArray, shipId) {
+                return shipsArray.find(ship => ship.id === shipId);
+            }
+
+            /** Aggiorna lo stato di tutte le celle di una nave a 'sunk' */
+            function markShipAsSunk(board, ship) {
+                ship.cells.forEach(([y, x]) => {
+                    board[y][x].state = 'sunk';
+                });
+            }
+
+            // === AVVIO ===
+            initializeGame();
+        });
+    </script>
+
+</body>
+</html>
+
